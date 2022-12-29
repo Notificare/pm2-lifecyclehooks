@@ -1,0 +1,29 @@
+{
+  "name": "pm2-lifecyclehooks",
+  "version": "0.0.1",
+  "description": "A module to handle AWS lifecycle hooks for PM2",
+  "dependencies": {
+    "@aws-sdk/client-auto-scaling": "^3.238.0",
+    "@aws-sdk/client-ec2": "^3.238.0",
+    "@aws-sdk/credential-providers": "^3.238.0",
+    "@pm2/io": "^5.0.0",
+    "axios": "^1.2.2",
+    "pm2": "^5.2.2"
+  },
+  "config": {
+    "aws-lifecycle-name": "OVERWRITE_ME"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/clikex/pm2-lifecyclehooks.git"
+  },
+  "apps": [
+    {
+      "name": "pm2-lifecyclehooks",
+      "script": "main.js",
+      "max_memory_restart": "200M"
+    }
+  ],
+  "author": "Wouter van der Meulen",
+  "license": "MIT"
+}
