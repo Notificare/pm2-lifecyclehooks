@@ -9,7 +9,7 @@ The goal of this module is to resolve `INSTANCE_LAUNCHING` hooks when there are 
 - [x] Enable PM2 plugin
 - [x] Check for existing lifecycle hooks
 - [x] Retrieve AWS metadata
-- [ ] Resolve hooks
-- [ ] Add PM2 configuration to define process names
-- [ ] Gracefully stop all PM2 workers processes
+- [x] Resolve hooks
+- [x] Add PM2 configuration to define process names
+- [x] Gracefully stop all PM2 workers processes
 - [ ] Typescript rewrite

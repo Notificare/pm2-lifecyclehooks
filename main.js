@@ -1,9 +1,9 @@
 const { fromNodeProviderChain } = require("@aws-sdk/credential-providers");
-const { AutoScalingClient, DescribeAutoScalingInstancesCommand, DescribeLifecycleHooksCommand} = require("@aws-sdk/client-auto-scaling");
+const { AutoScalingClient, DescribeAutoScalingInstancesCommand, DescribeLifecycleHooksCommand, CompleteLifecycleActionCommand} = require("@aws-sdk/client-auto-scaling");
 const axios = require('axios');
-const io = require('@pm2/io')
-
-const conf = io.initModule()
+const pmx = require('pmx')
+const pm2 = require('pm2')
+const conf = pmx.initModule();
 
 // Default metadata endpoint for AWS
 const metadataURL = "http://169.254.169.254"
@@ -14,9 +14,21 @@ async function isAWS() {
       return true;
     }
   }).catch(function (err) {
-    console.log("Unable to fetch -", err);
     return false;
   });
+}
+
+async function completeLifecycleHook(ctx, hook) {
+  client = new AutoScalingClient({ region: ctx.region });
+  const input = {
+    AutoScalingGroupName: ctx.autoscalingGroupName,
+    LifecycleActionResult: "CONTINUE",
+    LifecycleHookName: hook.LifecycleHookName,
+    InstanceId: ctx.instanceId
+  };
+  const command = new CompleteLifecycleActionCommand(input);
+  result = await client.send(command);
+  console.log(result);
 }
 
 async function getMetadata(path) {
@@ -65,6 +77,46 @@ async function getLifecycleState() {
   });
 }
 
+async function stopPM2Process(processName) {
+  pm2.connect(function(err) {
+    if (err) {
+      console.error(err);
+      process.exit(2);
+    }
+    pm2.stop(processName, function(err, proc) {
+      pm2.disconnect();
+      if (err) {
+        throw err;
+      }
+    });
+  });
+}
+
+function getPM2ProcessList() {
+  let procs;
+  pm2.connect(function(err) {
+    if (err) {
+      console.error(err);
+      process.exit(2);
+    }
+    pm2.list(function(err, list) {
+      procs = list.filter((item) => {
+        return item.pm2_env.pmx_module != true;
+      }).map((item) => {
+        return item.name;
+      });
+
+      console.log(procs);
+      pm2.disconnect();
+      if (err) {
+        throw err;
+      }
+      return list
+    });
+  });
+  return procs
+}
+
 async function checkLifecycles(ctx) {
     getLifecycleState().then(async (state) => {
       console.log("Checking for Lifecycle Hooks...");
@@ -84,11 +136,34 @@ async function checkLifecycles(ctx) {
           return hook.LifecycleTransition === "autoscaling:EC2_INSTANCE_TERMINATING"
         });
 
+        conf.workers_to_monitor.forEach((worker) => {
+          console.log(worker);
+          stopPM2Process(worker);
+
+          setInterval(() => {
+            if(getPM2ProcessList().join() != '') {
+              completeLifecycleHook(ctx, hook);
+              clearInterval(this);
+            }
+          }, 1000)
+        });
       } else if (state == "Pending:Wait") {
         console.log("Starting up, resolving Lifecycle Hook...");
         hook = result.LifecycleHooks.find(hook => {
           return hook.LifecycleTransition === "autoscaling:EC2_INSTANCE_LAUNCHING"
         });
+        const procs = getPM2ProcessList();
+
+        console.log(procs);
+
+        procs = procs.filter((proc) => {
+          return conf.workers_to_monitor.includes(proc);
+        });
+
+        if(procs.sort().join() === conf.workers_to_monitor.sort().join()) {
+          console.log("All processes running, resolving Lifecycle Hook...");
+          completeLifecycleHook(ctx, hook);
+        }
       }
       setTimeout(() => {
         checkLifecycles(ctx);
@@ -97,17 +172,19 @@ async function checkLifecycles(ctx) {
 }
 
 async function main() {
-  if (await isAWS()) {
+  await isAWS().then(response => {
+    if(response == true) {
     console.log('Currently running on EC2, continuing...');
 
-    const ctx = await getInstanceContext()
-    console.log(ctx)
+    getInstanceContext().then(ctx => {
+      checkLifecycles(ctx)
+    });
 
-    checkLifecycles(ctx)
-  } else {
-    console.log('Not running on EC2, waiting 10 seconds...');
-    setTimeout(() => { main()}, 10000);
-  }
+    } else {
+      console.log('Not running on EC2, waiting 10 seconds...');
+      setTimeout(() => { main()}, 5000);
+    }
+  });
 }
 
 main();
