@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    // "lib": ["ESNext"],
+    "module": "commonjs",
+    "target": "es2021",
+    "outDir": "dist",
+
+    "strict": true,
+    "esModuleInterop": true,
+    // "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    // "moduleResolution": "node"
+  },
+  "comments": false,
+  "include": ["src"],
+  "compileOnSave": true,
+  "exclude": ["node_modules"],
+  "rules": {
+    "no-console": false //Disable for typescript
+  }
+}
