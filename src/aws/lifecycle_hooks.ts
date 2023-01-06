@@ -1,14 +1,14 @@
-import { AutoScalingClient, CompleteLifecycleActionCommand, LifecycleHook } from "@aws-sdk/client-auto-scaling";
-import { Context } from '../types';
+import { AutoScalingClient, CompleteLifecycleActionCommand, LifecycleHook } from '@aws-sdk/client-auto-scaling';
+import Context from '../types';
 
-
-export async function completeLifecycleHook(ctx: Context, hook: LifecycleHook|undefined): Promise<void> {
+// eslint-disable-next-line max-len
+export default async function completeLifecycleHook(ctx: Context, hook: LifecycleHook | undefined): Promise<void> {
   const client = new AutoScalingClient({ region: ctx.region });
   const input = {
     AutoScalingGroupName: ctx.autoscalingGroupName,
-    LifecycleActionResult: "CONTINUE",
+    LifecycleActionResult: 'CONTINUE',
     LifecycleHookName: hook?.LifecycleHookName,
-    InstanceId: ctx.instanceId
+    InstanceId: ctx.instanceId,
   };
   const command = new CompleteLifecycleActionCommand(input);
   const result = await client.send(command);
