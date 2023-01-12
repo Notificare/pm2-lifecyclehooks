@@ -75,24 +75,34 @@ export default class LifecycleHandler {
    */
   async checkLifecycles(): Promise<void> {
     if (await this.metadata.getLifecycleState() === 'Terminated') {
+      console.log('Instance lifecycle is: Terminated');
       this.stop();
       try {
+        console.log('Stopping all PM2 processes');
         await stopPM2Processes();
+        console.log('Successfully stopped all PM2 processes');
       } catch (e) {
         // PM2 failed to stop processes, let's still continue and complete lifecycle hooks
         const err = e as Error;
         console.error('Error stopping PM2 processes: ', err.message);
       }
+      console.log('Retrieving autoscaling group info...');
       const groupName = await this.getAutoScalingGroup();
       if (groupName) {
+        console.log('Checking lifecycle hooks for ', groupName);
         const input = { AutoScalingGroupName: groupName };
         const command = new DescribeLifecycleHooksCommand(input);
         const result = await this.client.send(command);
         const hooks = result.LifecycleHooks ?? [];
         const hook = hooks.find((h: LifecycleHook) => h.LifecycleTransition === 'autoscaling:EC2_INSTANCE_TERMINATING');
         if (hook) {
+          console.log('Completing lifecycle hook: ', hook.LifecycleHookName);
           await this.completeLifecycleHook(hook);
+        } else {
+          console.log('No lifecycle hooks to complete');
         }
+      } else {
+        console.log('No autoscaling group for this instance');
       }
     }
   }
@@ -101,11 +111,11 @@ export default class LifecycleHandler {
    * Complete a lifecycle hook to continue with termination process
    * @param hook
    */
-  async completeLifecycleHook(hook: LifecycleHook | undefined): Promise<void> {
+  async completeLifecycleHook(hook: LifecycleHook): Promise<void> {
     const input = {
       AutoScalingGroupName: this.groupName,
       LifecycleActionResult: 'CONTINUE',
-      LifecycleHookName: hook?.LifecycleHookName,
+      LifecycleHookName: hook.LifecycleHookName,
       InstanceId: this.instanceId,
     };
     const command = new CompleteLifecycleActionCommand(input);

@@ -9,6 +9,7 @@ function main(): void {
     if (response) {
       console.log('Currently running on EC2, continuing...');
       metadata.getInstanceContext().then((ctx) => {
+        console.log('Starting Lifecycle handler');
         const lifecycleHandler = new LifecycleHandler(ctx, metadata);
         lifecycleHandler.start();
       }).catch((err) => {
