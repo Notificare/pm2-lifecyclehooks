@@ -1,11 +1,20 @@
 import pm2 from 'pm2';
 
-export default function stopPM2Procs(): void {
-  pm2.connect((err: Error) => {
-    if (err) console.error(err);
-    pm2.stop('all', (stopErr) => {
-      pm2.disconnect();
-      if (stopErr) throw stopErr;
+export default async function stopPM2Processes(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    pm2.connect((err) => {
+      if (err) {
+        reject(err);
+      } else {
+        pm2.stop('all', (stopErr) => {
+          pm2.disconnect();
+          if (stopErr) {
+            reject(stopErr);
+          } else {
+            resolve();
+          }
+        });
+      }
     });
   });
 }
