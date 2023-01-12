@@ -11,6 +11,9 @@ function main(): void {
       metadata.getInstanceContext().then((ctx) => {
         const lifecycleHandler = new LifecycleHandler(ctx, metadata);
         lifecycleHandler.start();
+      }).catch((err) => {
+        console.log('Failed to get instance context: ', err.message);
+        setTimeout(() => main(), 10000);
       });
     } else {
       console.log('Not running on EC2, waiting 10 seconds...');

@@ -1,6 +1,6 @@
 import {
   AutoScalingClient,
-  CompleteLifecycleActionCommand,
+  CompleteLifecycleActionCommand, DescribeAutoScalingInstancesCommand,
   DescribeLifecycleHooksCommand,
   LifecycleHook,
 } from '@aws-sdk/client-auto-scaling';
@@ -16,7 +16,7 @@ export default class LifecycleHandler {
 
   private readonly groupName: string | undefined;
 
-  private readonly instanceId: string | undefined;
+  private readonly instanceId: string;
 
   private terminating: boolean;
 
@@ -33,7 +33,6 @@ export default class LifecycleHandler {
    * @param options
    */
   constructor(ctx: Context, metadata: Metadata, options?: { checkInterval: number; } | undefined) {
-    this.groupName = ctx.autoscalingGroupName;
     this.instanceId = ctx.instanceId;
     this.client = new AutoScalingClient({ region: ctx.region });
     this.metadata = metadata || new Metadata();
@@ -59,11 +58,23 @@ export default class LifecycleHandler {
   }
 
   /**
+   * Get the name of the autoscaling group this instance  is in
+   */
+  async getAutoScalingGroup(): Promise<string | undefined> {
+    const command = new DescribeAutoScalingInstancesCommand({
+      InstanceIds: [this.instanceId],
+    });
+    const result = await this.client.send(command);
+    const instance = result.AutoScalingInstances?.[0];
+    return instance?.AutoScalingGroupName || undefined;
+  }
+
+  /**
    * Check if there is a pending Terminating:Wait lifecycle
    * If so, stop all PM2 processes and complete the lifecycle hook
    */
   async checkLifecycles(): Promise<void> {
-    if (await this.metadata.getLifecycleState() === 'Terminating:Wait') {
+    if (await this.metadata.getLifecycleState() === 'Terminated') {
       this.stop();
       try {
         await stopPM2Processes();
@@ -72,17 +83,24 @@ export default class LifecycleHandler {
         const err = e as Error;
         console.error('Error stopping PM2 processes: ', err.message);
       }
-      const input = { AutoScalingGroupName: this.groupName };
-      const command = new DescribeLifecycleHooksCommand(input);
-      const result = await this.client.send(command);
-      const hooks = result.LifecycleHooks ?? [];
-      const hook = hooks.find((h: LifecycleHook) => h.LifecycleTransition === 'autoscaling:EC2_INSTANCE_TERMINATING');
-      if (hook) {
-        await this.completeLifecycleHook(hook);
+      const groupName = await this.getAutoScalingGroup();
+      if (groupName) {
+        const input = { AutoScalingGroupName: groupName };
+        const command = new DescribeLifecycleHooksCommand(input);
+        const result = await this.client.send(command);
+        const hooks = result.LifecycleHooks ?? [];
+        const hook = hooks.find((h: LifecycleHook) => h.LifecycleTransition === 'autoscaling:EC2_INSTANCE_TERMINATING');
+        if (hook) {
+          await this.completeLifecycleHook(hook);
+        }
       }
     }
   }
 
+  /**
+   * Complete a lifecycle hook to continue with termination process
+   * @param hook
+   */
   async completeLifecycleHook(hook: LifecycleHook | undefined): Promise<void> {
     const input = {
       AutoScalingGroupName: this.groupName,
@@ -91,7 +109,6 @@ export default class LifecycleHandler {
       InstanceId: this.instanceId,
     };
     const command = new CompleteLifecycleActionCommand(input);
-    const result = await this.client.send(command);
-    console.log(result);
+    await this.client.send(command);
   }
 }

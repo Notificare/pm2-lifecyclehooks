@@ -1,7 +1,5 @@
 export default class Context {
-  instanceId?: string;
+  instanceId!: string;
 
-  region?: string;
-
-  autoscalingGroupName?: string;
+  region!: string;
 }

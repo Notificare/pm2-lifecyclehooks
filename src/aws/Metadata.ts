@@ -48,7 +48,7 @@ export default class Metadata {
 
   async getLifecycleState(): Promise<string | undefined> {
     try {
-      return await this.getAWSMetadata('/autoscaling/lifecycle');
+      return await this.getAWSMetadata('/autoscaling/target-lifecycle-state');
     } catch (e: unknown) {
       const err = e as Error;
       console.error('Error retrieving lifecycle state', err.message);
@@ -58,15 +58,9 @@ export default class Metadata {
 
   async getInstanceContext(): Promise<Context> {
     const ctx = new Context();
-    try {
-      const resp = await axios.get(`${this.metadataURL}/latest/dynamic/instance-identity/document`, { timeout: 10000 });
-      ctx.instanceId = resp.data.instanceId;
-      ctx.region = resp.data.region;
-      return ctx;
-    } catch (e: unknown) {
-      const err = e as Error;
-      console.error('Error retrieving instance context', err.message);
-    }
+    const resp = await axios.get(`${this.metadataURL}/latest/dynamic/instance-identity/document`, { timeout: 10000 });
+    ctx.instanceId = resp.data.instanceId;
+    ctx.region = resp.data.region;
     return ctx;
   }
 }
