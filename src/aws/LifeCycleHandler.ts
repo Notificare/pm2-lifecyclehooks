@@ -14,8 +14,6 @@ import stopPM2Processes from '../pm2';
 export default class LifecycleHandler {
   private client: AutoScalingClient;
 
-  private readonly groupName: string | undefined;
-
   private readonly instanceId: string;
 
   private terminating: boolean;
@@ -113,7 +111,7 @@ export default class LifecycleHandler {
    */
   async completeLifecycleHook(hook: LifecycleHook): Promise<void> {
     const input = {
-      AutoScalingGroupName: this.groupName,
+      AutoScalingGroupName: hook.AutoScalingGroupName,
       LifecycleActionResult: 'CONTINUE',
       LifecycleHookName: hook.LifecycleHookName,
       InstanceId: this.instanceId,
